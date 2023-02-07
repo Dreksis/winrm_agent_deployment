@@ -7,7 +7,7 @@ A simple powershell script designed to deploy a compressed package of tools/agen
 
 It is designed to be lightweight/minimal, to facilitate quick troubleshooting during threat hunting engagements.
 
-![alt text](https://github.com/Dreksis/powershell_agent_deployment/blob/main/deployment_package/Powershell%20Deployment%20flow%20diagram.PNG)
+![alt text](https://github.com/Dreksis/winrm_agent_deployment/blob/main/deployment_package/Powershell%20Deployment%20flow%20diagram.PNG)
 
 
 ## Requirements
