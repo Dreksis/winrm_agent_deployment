@@ -16,10 +16,10 @@ It is designed to be lightweight/minimal, to facilitate quick troubleshooting du
 - A valid set of credentials for establishing remote PowerShell sessions
 - The cargo directory must be zipped and placed in the \powershell_deploy directory
 
-## Contents of \deployment_package\
+## Contents of deployment_package\
+- This is a sanitized deployment_package. All of the below have been removed except for lightweight_push_and_run.ps1 and Powershell Deployment flow diagram.png
 - **{A22F621A-10F9-4CA3-9798-9730AB750EB6}**  This is the group policy that facilitates the WinRM deployment across the domain. Provides WinRM enablements and an enhanced audit policy. It is based off of Palantir's open source "Enhanced Logging" policy. {A22F621A-10F9-4CA3-9798-9730AB750EB6} must be imported and linked to the domain prior to deployment.
 - **cargo** This is a container for the agents, software, and capabilities that will be deployed. It is meant to be tailored to the threat hunting team's requirements.
-- **endgame** This is a convenience container to hold the endgame binary and its accompanying config. It must be moved to cargo if it is to be deployed. If endgame is to be renamed, that change must be reflected in the variables set in package_installer.ps1
 - **licenses** This is a convenience container to hold unattributable licenses for Aurora and Thor. They must be independently moved to the aurora and thor folders respectively prior to deployment.
 - **powershell_deploy** This directory is what will be copied to each endpoint during the deployment. It contains package_installer.ps1 and the cargo directory in a compressed .zip. The cargo directory will automatically be compressed and transferred to this directory as cargo.zip on execution of lightweight_push_and_run.ps1
 - **lightweight_push_and_run.ps1** Deployment script. Pushes contents of powershell_deploy to each endpoint and starts the installation process of agents. Each endpoint is executed as a WinRM session job for speed and efficiency
