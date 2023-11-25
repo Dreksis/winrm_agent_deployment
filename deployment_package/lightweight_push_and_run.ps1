@@ -150,8 +150,3 @@ while ((Get-job -State Completed -HasMoreData $true) -or (get-job -state Running
 Set-Variable -Name 'install_check' -value (Select-String -Path $InstallJobLog -Pattern "INSTALL OF") -Scope global -PassThru | Out-Null
 echo $install_check >> "C:\Users\$user\Documents\deployment_package\exit_codes.txt"
 Remove-PSSession *
-
-#to sign the script use:
-#New-SelfSignedCertificate -subject "ATA Authenticode" -CertStoreLocation cert:\localmachine\my -type CodeSigningCert
-#$codecertificate= gci cert:\localmachine\my | Where-Object {$_.Subject -eq "CN=ATA Authenticode"}
-#Set-AuthenticodeSignature C:\users\$user\Documents\deployment_package\lightweight_push_and_run.ps1 $codecertificate 
