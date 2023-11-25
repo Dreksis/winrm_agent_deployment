@@ -1,9 +1,9 @@
-# Rapid peer-to-peer agent deployments via WinRM. 
-## Developed for threat hunting teams desiring low visibility and reduced risk of attribution in non-permissive domains.
+# Rapid, secure, and efficient deployment of tools/agents via WinRM. 
+## Developed for threat hunting teams desiring low visibility in non-permissive domains.
 
 ## lightweight_push_and_run.ps1
 
-A simple powershell script designed to deploy a compressed package of tools/agents, perform a quick survey, and install agents/tools on multiple computers specified in a file named computers.txt. The script establishes a remote PowerShell session to each computer and performs various operations such as copying files, installing agents, and gathering basic survey information.
+This script is designed as a rapid, secure, and efficient deployment solution. It facilitates operations designed to deploy a compressed package of tools/agents, perform a quick survey, and install agents/tools on multiple computers specified in a file named computers.txt. The script establishes a remote PowerShell session to each computer and performs various operations such as copying files, installing agents, and gathering basic survey information.
 
 It is designed to be lightweight/minimal, to facilitate quick troubleshooting during threat hunting engagements.
 
