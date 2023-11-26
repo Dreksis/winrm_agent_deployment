@@ -27,10 +27,13 @@ It is designed to be lightweight/minimal, to facilitate quick troubleshooting du
 
 
 ## Usage
+- Remember, this script is powerful and should be used with caution, especially because it enables remote execution and involves critical operations on multiple computers.
 - Link the {A22F621A-10F9-4CA3-9798-9730AB750EB6} group policy to the domain or respective OU.
+- Ensure you have a cargo.zip package and package_installer.ps1 script ready for deployment.
 - Update the variables in package_installer.ps1 to match your environment and agent configuration.
 - Generate the host names of endpoints for deployment and list them in computers.txt. 
-- Run the script as an administrator.
+- Run the script in a PowerShell environment with the necessary permissions to perform these operations.
+- Monitor the process through the logs generated, particularly InstallJobLog.txt and exit_codes.txt.
 
 
 ## Logs
