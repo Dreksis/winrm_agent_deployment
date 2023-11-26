@@ -63,9 +63,7 @@ Read-Host -Prompt "Have you updated the Win7 endpoints to WMF 5.1 and powershell
 Write-Host "Initiating WinRM deployment"
 
 $current_user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split('\')[1]
-
-
-# Sets the global variable 'user' to 'Administrator'.
+# Sets the global variable 'user' to '$current_user'
 Set-Variable -Name 'user' -Value ("$current_user") -Scope global -PassThru | Out-Null
 # Sets the global variable 'source_dir' to the path of the deployment package.
 Set-Variable -Name 'source_dir' -Value ("C:\Users\$user\Documents\deployment_package\") -Scope global -PassThru | Out-Null
