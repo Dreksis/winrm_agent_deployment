@@ -23,7 +23,7 @@ The script performs the following tasks:
 .NOTES
 Author: SEER
 Date: 04/08/2022
-Version: 1.0
+Version: 1.1
 
 For reverse compatibility with 32 bit Win7 systems, uncomment Register-PSSessionConfiguration microsoft.powershell32 -ProcessorArchitecture x86 -Force
 
@@ -48,37 +48,44 @@ Set-AuthenticodeSignature C:\users\$user\Documents\deployment_package\lightweigh
 #MP = Mission Partner (the customer)
 
 # This section prompts the user to complete a pre-deployment checklist.
-Read-host -prompt "A Pre-Deployment checklist. We recommend using it"
-Read-host -prompt "Has the beats config been updated to point to the correct kit IP? If not, CNTRL+C NOW"
-Read-host -prompt "Has the beats config been updated to pull at least the last 30 days of logs? If not, CNTRL+C NOW"
-Read-host -prompt "Have you imported and linked the {A22F621A-10F9-4CA3-9798-9730AB750EB6} audit policy? If not, CNTRL+C NOW"
-Read-host -prompt "Has the Thor and Aurora licences been supplied and sanitized of attrib? If not, CNTRL+C NOW"
-Read-host -prompt "Have you queried the AD and generated a list of machines in computers.txt? If not, CNTRL+C NOW"
-Read-host -prompt "Has the MP AUTHORIZED your computers listing? If not, CNTRL+C NOW"
-Read-host -prompt "Have you completed rigorous testing on a variety of machines with consent of the MP? If not, CNTRL+C NOW"
-Read-host -prompt 'Has the installer.ps1 $sourcedir variable been updated to pull from C:\windows\temp\powershell_deploy or a relevant SYSVOL location? If not, CNTRL+C NOW'
-Read-host -prompt "Has a decision been made to incude a stand-alone Endgame binary inside the cargo.zip archive for in-band deployment? Have you updated the binary key variable? If not, CNTRL+C NOW"
-Read-host -prompt "Have you commented/un-commented line #112 for a speedy deployment via job's? If not, CNTRL+C NOW"
-Read-host -prompt "Have you updated the Win7 endpoints to WMF 5.1 and powershell 5.1? If not this will fail."
-Read-host -prompt "Have you updated the user variable to the correct user folder?."
+Read-Host -Prompt "A Pre-Deployment checklist. We recommend using it"
+Read-Host -Prompt "Has the beats config been updated to point to the correct kit IP? If not, CNTRL+C NOW"
+Read-Host -Prompt "Has the beats config been updated to pull at least the last 30 days of logs? If not, CNTRL+C NOW"
+Read-Host -Prompt "Have you imported and linked the {A22F621A-10F9-4CA3-9798-9730AB750EB6} audit policy? If not, CNTRL+C NOW"
+Read-Host -Prompt "Has the Thor and Aurora licences been supplied and sanitized of attrib? If not, CNTRL+C NOW"
+Read-Host -Prompt "Have you queried the AD and generated a list of machines in computers.txt? If not, CNTRL+C NOW"
+Read-Host -Prompt "Has the MP AUTHORIZED your computers listing? If not, CNTRL+C NOW"
+Read-Host -Prompt "Have you completed rigorous testing on a variety of machines with consent of the MP? If not, CNTRL+C NOW"
+Read-Host -Prompt 'Has the installer.ps1 $sourcedir variable been updated to pull from C:\windows\temp\powershell_deploy or a relevant SYSVOL location? If not, CNTRL+C NOW'
+Read-Host -Prompt "Has a decision been made to incude a stand-alone Endgame binary inside the cargo.zip archive for in-band deployment? Have you updated the binary key variable? If not, CNTRL+C NOW"
+Read-Host -Prompt "Have you updated the Win7 endpoints to WMF 5.1 and powershell 5.1? If not this will fail."
 
 Write-Host "Initiating WinRM deployment"
 
+$current_user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split('\')[1]
+
+
 # Sets the global variable 'user' to 'Administrator'.
-Set-Variable -Name 'user' -value ('Administrator') -Scope global -PassThru | Out-Null
+Set-Variable -Name 'user' -Value ("$current_user") -Scope global -PassThru | Out-Null
 # Sets the global variable 'source_dir' to the path of the deployment package.
-set-variable -name 'source_dir' -value ("C:\Users\$user\Documents\deployment_package\") -Scope global -PassThru | Out-Null
+Set-Variable -Name 'source_dir' -Value ("C:\Users\$user\Documents\deployment_package\") -Scope global -PassThru | Out-Null
 # Sets the path of the computers.txt file.
 $computers_file = "C:\Users\$user\Documents\deployment_package\computers.txt"
-# Reads the contents of the computers.txt file and assigns them to the $iterative variable.
-$iterative = Get-Content $computers_file
+# Checks if the computers.txt file exists before attempting to read its contents.
+if (Test-Path $computers_file) {
+    # Reads the contents of the computers.txt file and assigns them to the $iterative variable.
+    $iterative = Get-Content $computers_file
+} else {
+    Write-Host "The computers.txt file does not exist."
+    Exit
+}
 # Sets the global variable 'installjoblog' to the path of the InstallJobLog.txt file.
-Set-Variable -Name 'installjoblog' -value ("C:\Users\$user\Documents\deployment_package\InstallJobLog.txt") -Scope global -PassThru | Out-Null 
+Set-Variable -Name 'installjoblog' -Value ("C:\Users\$user\Documents\deployment_package\InstallJobLog.txt") -Scope global -PassThru | Out-Null 
 # Enables remote PowerShell execution on the local and target computers and prompts the user for their credentials.
-enable-psremoting -skipnetworkprofilecheck -force
-$cred = get-credential
+Enable-PSRemoting -SkipNetworkProfileCheck -Force
+$cred = Get-Credential
 # Sets the global variable 'session_timeout' to a WinRM session timeout of 200000 seconds.
-Set-Variable -Name 'session_timeout' -value (New-PSSessionOption -IdleTimeout 200000) -Scope global -PassThru | Out-Null
+Set-Variable -Name 'session_timeout' -Value (New-PSSessionOption -IdleTimeout 200000) -Scope global -PassThru | Out-Null
 
 # Prompts the user to update Thor/Aurora signatures and upgrade binaries.
 $response = Read-Host "Update Thor/Aurora signatures and upgrade binaries? (Y/N)"
@@ -94,18 +101,33 @@ if (($response -eq "Y") -and (Test-Connection -ComputerName "www.google.com" -Co
 }
 
 # Removes the old deployment package and creates a new one.
-Remove-Item $source_dir\powershell_deploy\cargo.zip
-Compress-Archive -Path $source_dir\cargo\* -DestinationPath $source_dir\powershell_deploy\cargo.zip
+Remove-Item "$source_dir\powershell_deploy\cargo.zip" -ErrorAction SilentlyContinue
+if (Test-Path "$source_dir\cargo\*") {
+    Compress-Archive -Path "$source_dir\cargo\*" -DestinationPath "$source_dir\powershell_deploy\cargo.zip"
+} else {
+    Write-Host "The cargo directory does not exist."
+    Exit
+}
 
 # Loops through each computer specified in the $iterative variable.
 ForEach ($computer in $iterative) {
     # Attempts to open a remote PowerShell session on the target computer using the New-PSSession cmdlet.
     Write-Host ("Attempting to open WINRM session on $computer")
-    Set-Variable -Name 'session' -value (New-PSSession -computername $computer -Credential $cred -SessionOption $session_timeout) -Scope global -PassThru | Out-Null
+    try {
+        $session = New-PSSession -ComputerName $computer -Credential $cred -SessionOption $session_timeout -ErrorAction Stop
+    } catch {
+        Write-Host "Failed to open WINRM session on $computer"
+        continue
+    }
     # Checks the version of PowerShell on the target computer and if it is greater than or equal to version 4, it copies the deployment package (cargo.zip) and the package_installer.zip to the C:\Windows\Temp directory on the target computer using the Copy-Item cmdlet.
     $powershellversioncheck = Invoke-Command -Session $session -ScriptBlock { $PSVersionTable.PSVersion }
     if ($powershellversioncheck.major -ge 4) {
-        Copy-Item -Path $source_dir\powershell_deploy\ -Destination ('C:\Windows\Temp') -tosession $session -Recurse -Force
+        if (Test-Path "$source_dir\powershell_deploy\cargo.zip") {
+            Copy-Item -Path "$source_dir\powershell_deploy" -Destination 'C:\Windows\Temp' -ToSession $session -Recurse -Force
+        } else {
+            Write-Host "The deployment package does not exist."
+            Exit
+        }
     }
     # Runs a series of survey commands on the target computer using the Invoke-Command cmdlet.
     Invoke-Command -Session $session -ScriptBlock {
@@ -119,7 +141,7 @@ ForEach ($computer in $iterative) {
         echo "Powershell version is...." $PSVersionTable.PSVersion.Major
         powershell -executionpolicy bypass -windowstyle hidden -command "Get-LocalGroupMember -Group 'Administrators'; net user; systeminfo; gpupdate /force; gpresult /r"
         # If the deployment package successfully copied to the endpoint and there is enough space on the target computer for installation, it runs the package installer script (package_installer.ps1), then removes the deployment package and other files after installation.
-        if ((Test-Path -Path 'C:\Windows\Temp\powershell_deploy') -and (Get-CimInstance -classname win32_logicaldisk -filter "deviceid='C:'" | ? { $_.FreeSpace -ge 900MB })) {
+        if ((Test-Path -Path 'C:\Windows\Temp\powershell_deploy') -and (Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'" | ? { $_.FreeSpace -ge 900MB })) {
             powershell -windowstyle hidden -executionpolicy bypass -f 'C:\Windows\Temp\powershell_deploy\package_installer.ps1'
             #powershell -windowstyle hidden -executionpolicy bypass -f 'C:\Windows\Temp\powershell_deploy\package_uninstaller.ps1'
             remove-item -recurse -force 'C:\Windows\Temp\powershell_deploy'
@@ -138,15 +160,15 @@ ForEach ($computer in $iterative) {
     } -AsJob -JobName "deployinstall$computer" # Comment this line just after the }, to remain inside sessions and recieve output of script for troubleshooting/testing. This will significantly slow the deployment process.
     Write-Host ("Done with $computer. Looping to the next machine ")
     # Writes the output of the job to the InstallJobLog.txt file.
-    Get-job -State Completed -HasMoreData $true | Receive-Job *>&1 >> $installjoblog
+    Get-Job -State Completed -HasMoreData $true | Receive-Job *>&1 >> $installjoblog
 } 
 
 # This portion of code uses a while loop to scan all the jobs running, and immediately after they change status from 'running' to 'complete', pipes all the events that occurred inside that job to our installjoblog.txt. 
 # This allows us to observe and troubleshoot any error encountered on the endpoints. A significant advantage of a powershell deployment. 
-while ((Get-job -State Completed -HasMoreData $true) -or (get-job -state Running)) { Get-job -State Completed -HasMoreData $true | Receive-Job *>&1 >> $installjoblog }
+while ((Get-Job -State Completed -HasMoreData $true) -or (Get-Job -State Running)) { Get-Job -State Completed -HasMoreData $true | Receive-Job *>&1 >> $installjoblog }
 
-# This portion performs post-processing on installjoblog.txt and cuts out everything except the successful or failed install of each agent and pipes it to a seperate exit_codes.txt. 
-# Serves as a straight to the point agent oberservation log.
-Set-Variable -Name 'install_check' -value (Select-String -Path $InstallJobLog -Pattern "INSTALL OF") -Scope global -PassThru | Out-Null
+# This portion performs post-processing on installjoblog.txt and cuts out everything except the successful or failed install of each agent and pipes it to a separate exit_codes.txt. 
+# Serves as a straight to the point agent observation log.
+Set-Variable -Name 'install_check' -Value (Select-String -Path $InstallJobLog -Pattern "INSTALL OF") -Scope global -PassThru | Out-Null
 echo $install_check >> "C:\Users\$user\Documents\deployment_package\exit_codes.txt"
 Remove-PSSession *
