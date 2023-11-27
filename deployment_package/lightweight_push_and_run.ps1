@@ -168,14 +168,14 @@ if (($response -eq "Y") -and (Test-Connection -ComputerName "www.google.com" -Co
 }
 
 # Removes the old deployment package and creates a new one.
-<#Remove-Item "$source_dir\powershell_deploy\cargo.zip" -ErrorAction SilentlyContinue
+Remove-Item "$source_dir\powershell_deploy\cargo.zip" -ErrorAction SilentlyContinue
 if (Test-Path "$source_dir\cargo\*") {
     Compress-Archive -Path "$source_dir\cargo\*" -DestinationPath "$source_dir\powershell_deploy\cargo.zip"
 } else {
     Write-Host "The cargo directory does not exist."
     Exit
 }
-#>
+
 
 # Loops through each computer specified in the $iterative variable.
 ForEach ($computer in $iterative) {
