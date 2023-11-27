@@ -67,17 +67,17 @@ function Perform-DeploymentChecklist {
 }
 
 # Main script execution
-$UserChoice = Read-Host "Do you want to perform the deployment checklist? (Yes/No)"
+$UserChoice = Read-Host "Do you want to perform the deployment checklist? (Y/N)"
 
 switch ($UserChoice.ToLower()) {
-    "yes" {
+    "y" {
         Perform-DeploymentChecklist
     }
-    "no" {
+    "n" {
         Write-Host "Deployment checklist skipped."
     }
     default {
-        Write-Host "Invalid input. Please enter 'Yes' or 'No'."
+        Write-Host "Invalid input. Please enter 'Y' or 'N'."
     }
 }
 
@@ -100,7 +100,8 @@ if (Test-Path $computers_file) {
 }
 
 $completedCount = 0
-$totalComputers = $computers_file.Count
+#$totalComputers = $computers_file.Count
+$totalComputers = $iterative.Count
 
 # Initialize timing variables
 $startTime = Get-Date
@@ -167,18 +168,44 @@ if (($response -eq "Y") -and (Test-Connection -ComputerName "www.google.com" -Co
     Write-Host "No internet connectivity or invalid response."
 }
 
-# Removes the old deployment package and creates a new one.
+<## Removes the old deployment package and creates a new one.
 Remove-Item "$source_dir\powershell_deploy\cargo.zip" -ErrorAction SilentlyContinue
 if (Test-Path "$source_dir\cargo\*") {
     Compress-Archive -Path "$source_dir\cargo\*" -DestinationPath "$source_dir\powershell_deploy\cargo.zip"
 } else {
     Write-Host "The cargo directory does not exist."
     Exit
+}#>
+
+# Prompt the user for decision
+$userInput = Read-Host "Do you want to compress the contents of the cargo directory and stage it for deployment> (Y/N)"
+
+# Prompt user for cargo compression and staging in powershell_deploy\
+switch ($userInput.ToLower()) {
+    "y" {
+            
+        Remove-Item "$source_dir\powershell_deploy\cargo.zip" -ErrorAction SilentlyContinue
+        if (Test-Path "$source_dir\cargo\*") {
+            Compress-Archive -Path "$source_dir\cargo\*" -DestinationPath "$source_dir\powershell_deploy\cargo.zip"
+            Write-Host "New deployment package created and staged successfully."
+        }
+        else {
+            Write-Host "The cargo directory does not exist."
+            Exit}
+    }
+    "n" {
+        Write-Host "Deployment package update has been cancelled."
+    }
+    default {
+        Write-Host "Invalid input. Please enter 'Y' or 'N'."
+        exit
+    }
 }
 
 
 # Loops through each computer specified in the $iterative variable.
 ForEach ($computer in $iterative) {
+    $startComputerTime = Get-Date
     # Attempts to open a remote PowerShell session on the target computer using the New-PSSession cmdlet.
     Write-Host ("Attempting to open WINRM session on $computer")
     try {
@@ -228,8 +255,7 @@ ForEach ($computer in $iterative) {
     Write-Host ("Done with $computer. Looping to the next machine ")
     # Writes the output of the job to the InstallJobLog.txt file.
     Get-Job -State Completed -HasMoreData $true | Receive-Job *>&1 >> $installjoblog
-    $startComputerTime = Get-Date
-    # End time for this computer and calculate duration
+    
     # End time for this computer and calculate duration
     $endComputerTime = Get-Date
     $duration = $endComputerTime - $startComputerTime
@@ -265,11 +291,18 @@ while ((Get-Job -State Completed -HasMoreData $true) -or (Get-Job -State Running
 
 # This portion performs post-processing on installjoblog.txt and cuts out everything except the successful or failed install of each agent and pipes it to a separate exit_codes.txt. 
 # Serves as a straight to the point agent observation log.
-$install_check = Set-Variable -Name 'install_check' -Value (Select-String -Path $InstallJobLog -Pattern "INSTALL OF") -Scope global -PassThru
-echo $install_check >> "C:\Users\$user\Documents\deployment_package\exit_codes.txt"
+$outputFilePath = "C:\Users\$user\Documents\deployment_package\exit_codes.txt"
+# Select lines containing 'INSTALL' and process them
+Select-String -Path $InstallJobLog -Pattern "INSTALL OF" | ForEach-Object {
+    # Cut everything before 'INSTALL' in each line
+    $_.Line -replace '^.*INSTALL', 'INSTALL'
+} | Out-File -FilePath $outputFilePath
+
+#Clean 
 Remove-PSSession *
 Get-Job | Where-Object { $_.PSJobTypeName -eq 'RemoteJob' } | Remove-Job
 
+#Final timing update
 $endTime = Get-Date
 $totalDuration = $endTime - $startTime
 Write-Host "Deployment completed in $($totalDuration.ToString())"
