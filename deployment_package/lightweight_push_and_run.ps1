@@ -60,13 +60,43 @@ function Perform-DeploymentChecklist {
     Read-Host -Prompt "Has the MP AUTHORIZED your computers listing? If not, CNTRL+C NOW"
     Read-Host -Prompt "Have you completed rigorous testing on a variety of machines with consent of the MP? If not, CNTRL+C NOW"
     Read-Host -Prompt 'Has the package_installer.ps1 $sourcedir variable been updated to pull from C:\windows\temp\powershell_deploy or a relevant SYSVOL location? If not, CNTRL+C NOW'
-    Read-Host -Prompt "Has a decision been made to incude a stand-alone Endgame binary inside the cargo.zip archive for in-band deployment? Have you updated the binary key variable? If not, CNTRL+C NOW"
+    Read-Host -Prompt "Has a decision been made to incude a stand-alone EDR binary inside the cargo.zip archive for in-band deployment? Have you updated the binary key variable? If not, CNTRL+C NOW"
     Read-Host -Prompt "Have you updated the Win7 endpoints to WMF 5.1 and powershell 5.1? If not this will fail."
 
     Write-Host "Deployment checklist completed."
 }
 
-# Main script execution
+# Option to auto-generate computers.txt
+
+# Define global variables
+$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split('\')[1]
+# Sets the global variable 'source_dir' to the path of the deployment package.
+$source_dir = "C:\Users\$user\Documents\deployment_package\"
+# Sets the path of the computers.txt file.
+$computers_file = "C:\Users\$user\Documents\deployment_package\computers.txt"
+
+# Check domain membership
+$domain = (Get-WmiObject Win32_ComputerSystem).Domain
+if ($domain -eq $env:COMPUTERNAME -or $domain -eq "WORKGROUP") {
+    # Machine is not part of a domain or is in WORKGROUP
+    "localhost".Trim() | Out-File $computers_file
+    Write-Host "Machine is in a workgroup or not part of a domain. 'localhost' added to computers.txt without trailing whitespace"
+} else {
+    # Machine is part of a domain, prompt for generating computers.txt
+    $generateComputersFile = Read-Host "Do you want to automatically generate computers.txt? (Y/N)"
+    if ($generateComputersFile -eq "Y") {
+        # Generate computers.txt
+        Get-ADComputer -Filter * -Properties dnshostname | Select-Object -ExpandProperty dnshostname | ForEach-Object { $_.Trim() } | Out-File $computers_file
+        Write-Host "computers.txt has been generated without trailing whitespace."
+    } else {
+        # Check for existence of computers.txt
+        if (-not (Test-Path $computers_file)) {
+            Write-Host "The computers.txt file does not exist. Please provide it and run the script again."
+            Exit
+        }
+    }
+}
+
 $UserChoice = Read-Host "Do you want to perform the deployment checklist? (Y/N)"
 
 switch ($UserChoice.ToLower()) {
@@ -85,11 +115,6 @@ Write-Host "Proceeding..."
 
 Write-Host "Initiating WinRM deployment"
 
-$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split('\')[1]
-# Sets the global variable 'source_dir' to the path of the deployment package.
-$source_dir = "C:\Users\$user\Documents\deployment_package\"
-# Sets the path of the computers.txt file.
-$computers_file = "C:\Users\$user\Documents\deployment_package\computers.txt"
 # Checks if the computers.txt file exists before attempting to read its contents.
 if (Test-Path $computers_file) {
     # Reads the contents of the computers.txt file and assigns them to the $iterative variable.
@@ -113,13 +138,6 @@ function Update-ProgressBar($completed, $total, $estimatedTimeRemaining) {
     $status = "{0:N2}% Complete - Estimated Time Remaining: {1}" -f $percentComplete, $estimatedTimeRemaining
     Write-Progress -Activity "Deployment Progress" -Status $status -PercentComplete $percentComplete
 }
-
-# Function to update and display the progress bar
-<#function Update-ProgressBar($completed, $total) {
-    $percentComplete = ($completed / $total) * 100
-    Write-Progress -Activity "Deployment Progress" -Status "$percentComplete% Complete:" -PercentComplete $percentComplete
-}
-#>
 
 # Define function to display job progress
 function Show-JobProgress {
@@ -167,16 +185,6 @@ if (($response -eq "Y") -and (Test-Connection -ComputerName "www.google.com" -Co
 } else {
     Write-Host "No internet connectivity or invalid response."
 }
-
-<## Removes the old deployment package and creates a new one.
-Remove-Item "$source_dir\powershell_deploy\cargo.zip" -ErrorAction SilentlyContinue
-if (Test-Path "$source_dir\cargo\*") {
-    Compress-Archive -Path "$source_dir\cargo\*" -DestinationPath "$source_dir\powershell_deploy\cargo.zip"
-} else {
-    Write-Host "The cargo directory does not exist."
-    Exit
-}#>
-
 # Prompt the user for decision
 $userInput = Read-Host "Do you want to compress the contents of the cargo directory and stage it for deployment> (Y/N)"
 
@@ -202,7 +210,7 @@ switch ($userInput.ToLower()) {
     }
 }
 
-
+# Main script execution
 # Loops through each computer specified in the $iterative variable.
 ForEach ($computer in $iterative) {
     $startComputerTime = Get-Date
@@ -226,6 +234,31 @@ ForEach ($computer in $iterative) {
     }
     # Runs a series of survey commands on the target computer using the Invoke-Command cmdlet.
     Invoke-Command -Session $session -ScriptBlock {
+        # Start logging to prevent fratricide 
+        function Log-Activity {
+            param(
+                [int]$EventId, 
+                [string]$Message,
+                [string]$EntryType = 'Information',
+                [string]$AnalystId
+            )
+        
+            # Define the log name and source
+            $logName = 'Response-Activities'
+            $sourceName = 'Response-Analysis'
+        
+            # Check if the event source exists, if not, create it
+            if (-not [System.Diagnostics.EventLog]::SourceExists($sourceName)) {
+                New-EventLog -LogName $logName -Source $sourceName
+            }
+        
+            # Create a detailed message including the analyst ID
+            $detailedMessage = "$Message Executed by $AnalystId"
+        
+            # Write the event log
+            Write-EventLog -LogName $logName -Source $sourceName -EventId $EventId -EntryType $EntryType -Message $detailedMessage
+        }
+        Log-Activity -EventId 1 -Message "Start of activity" -AnalystId "Analyst836"
         # For machine tagging when reviewing joblog.txt.
         $insidejobtagging = hostname
         # Starts the survey.
@@ -248,8 +281,10 @@ ForEach ($computer in $iterative) {
         #if  ($OSVersion -eq 6) {
         #echo "Win 7 or 8 based OS detected. Restarting to invoke start-up script"
         #shutdown /r /t 5} #32400 for 8 hours
+        
         # Optional capability to execute thor-lite scans against hosts identified inside of computers.txt. Make sure IP is updated to actual KIT IP.
         #Invoke-expression 'C:\ProgramData\WinSys\thor10.7lite-win-pack\thor64-lite.exe --nolog -s <KIT IP>:<PORT>:SYSLOGJSON:TCP --maxsysloglength 0'
+        Log-Activity -EventId 2 -Message "End of activity" -AnalystId "Analyst836"
         
     } -AsJob -JobName "deployinstall$computer" # Comment this line just after the }, to remain inside sessions and recieve output of script for troubleshooting/testing. This will significantly slow the deployment process.
     Write-Host ("Done with $computer. Looping to the next machine ")
